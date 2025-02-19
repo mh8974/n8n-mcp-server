@@ -99,6 +99,12 @@ cline config set-env n8n N8N_API_KEY your-api-key-here
 
 ## Current Features
 
+### User Management
+- List all users in your n8n instance
+- Create multiple users with specified roles (global:admin or global:member)
+- Retrieve user details by ID or email address
+- Delete users from your instance
+
 ### Workflow Management
 - List all workflows in your n8n instance
 - View detailed workflow information
@@ -179,12 +185,6 @@ The following features are planned for future releases:
 - Retrieve all executions
 - Retrieve an execution by its ID
 - Delete an execution by its ID
-
-### User Management
-- Retrieve all users
-- Create multiple users
-- Get user by ID/Email
-- Delete a user
 
 ### Credential Management
 - Create a credential

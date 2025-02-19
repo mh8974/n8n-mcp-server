@@ -4,6 +4,22 @@ import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprot
 import { z } from "zod";
 
 // Type definitions for n8n API responses
+interface N8nUser {
+  id: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  isPending: boolean;
+  role?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface N8nUserList {
+  data: N8nUser[];
+  nextCursor?: string;
+}
+
 interface N8nWorkflow {
   id: number;
   name: string;
@@ -70,6 +86,11 @@ class N8nClient {
           errorMessage = errorText;
         }
         throw new Error(`N8N API error: ${errorMessage}`);
+      }
+
+      // Handle 204 No Content responses
+      if (response.status === 204) {
+        return {} as T;
       }
 
       return await response.json() as T;
@@ -151,6 +172,28 @@ class N8nClient {
     return this.makeRequest<void>(`/projects/${projectId}`, {
       method: 'PUT',
       body: JSON.stringify({ name }),
+    });
+  }
+
+  // User management methods
+  async listUsers(): Promise<N8nUserList> {
+    return this.makeRequest<N8nUserList>('/users');
+  }
+
+  async createUsers(users: Array<{ email: string; role?: 'global:admin' | 'global:member' }>): Promise<any> {
+    return this.makeRequest('/users', {
+      method: 'POST',
+      body: JSON.stringify(users),
+    });
+  }
+
+  async getUser(idOrEmail: string): Promise<N8nUser> {
+    return this.makeRequest<N8nUser>(`/users/${idOrEmail}`);
+  }
+
+  async deleteUser(idOrEmail: string): Promise<void> {
+    return this.makeRequest<void>(`/users/${idOrEmail}`, {
+      method: 'DELETE',
     });
   }
 }
@@ -328,6 +371,66 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             name: { type: "string" }
           },
           required: ["clientId", "projectId", "name"]
+        }
+      },
+      {
+        name: "list-users",
+        description: "Retrieve all users from your instance. Only available for the instance owner.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            clientId: { type: "string" }
+          },
+          required: ["clientId"]
+        }
+      },
+      {
+        name: "create-users",
+        description: "Create one or more users in your instance.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            clientId: { type: "string" },
+            users: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  email: { type: "string" },
+                  role: { 
+                    type: "string",
+                    enum: ["global:admin", "global:member"]
+                  }
+                },
+                required: ["email"]
+              }
+            }
+          },
+          required: ["clientId", "users"]
+        }
+      },
+      {
+        name: "get-user",
+        description: "Get user by ID or email address.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            clientId: { type: "string" },
+            idOrEmail: { type: "string" }
+          },
+          required: ["clientId", "idOrEmail"]
+        }
+      },
+      {
+        name: "delete-user",
+        description: "Delete a user from your instance.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            clientId: { type: "string" },
+            idOrEmail: { type: "string" }
+          },
+          required: ["clientId", "idOrEmail"]
         }
       }
     ]
@@ -727,6 +830,140 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [{
             type: "text",
             text: `Successfully updated project ${projectId} with new name: ${name}`,
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: error instanceof Error ? error.message : "Unknown error occurred",
+          }],
+          isError: true
+        };
+      }
+    }
+
+    case "list-users": {
+      const { clientId } = args as { clientId: string };
+      const client = clients.get(clientId);
+      if (!client) {
+        return {
+          content: [{
+            type: "text",
+            text: "Client not initialized. Please run init-n8n first.",
+          }],
+          isError: true
+        };
+      }
+
+      try {
+        const users = await client.listUsers();
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(users.data, null, 2),
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: error instanceof Error ? error.message : "Unknown error occurred",
+          }],
+          isError: true
+        };
+      }
+    }
+
+    case "create-users": {
+      const { clientId, users } = args as { 
+        clientId: string; 
+        users: Array<{ 
+          email: string; 
+          role?: 'global:admin' | 'global:member' 
+        }> 
+      };
+      const client = clients.get(clientId);
+      if (!client) {
+        return {
+          content: [{
+            type: "text",
+            text: "Client not initialized. Please run init-n8n first.",
+          }],
+          isError: true
+        };
+      }
+
+      try {
+        const result = await client.createUsers(users);
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(result, null, 2),
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: error instanceof Error ? error.message : "Unknown error occurred",
+          }],
+          isError: true
+        };
+      }
+    }
+
+    case "get-user": {
+      const { clientId, idOrEmail } = args as { clientId: string; idOrEmail: string };
+      const client = clients.get(clientId);
+      if (!client) {
+        return {
+          content: [{
+            type: "text",
+            text: "Client not initialized. Please run init-n8n first.",
+          }],
+          isError: true
+        };
+      }
+
+      try {
+        const user = await client.getUser(idOrEmail);
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(user, null, 2),
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: error instanceof Error ? error.message : "Unknown error occurred",
+          }],
+          isError: true
+        };
+      }
+    }
+
+    case "delete-user": {
+      const { clientId, idOrEmail } = args as { clientId: string; idOrEmail: string };
+      const client = clients.get(clientId);
+      if (!client) {
+        return {
+          content: [{
+            type: "text",
+            text: "Client not initialized. Please run init-n8n first.",
+          }],
+          isError: true
+        };
+      }
+
+      try {
+        await client.deleteUser(idOrEmail);
+        return {
+          content: [{
+            type: "text",
+            text: `Successfully deleted user: ${idOrEmail}`,
           }]
         };
       } catch (error) {
