@@ -1,0 +1,50 @@
+name: n8n-mcp-server
+version: 1.0.0
+description: An MCP server that provides access to n8n workflows, executions, credentials, and more through the Model Context Protocol
+
+author: Illuminare Solutions
+license: MIT
+repository: https://github.com/illuminaresolutions/n8n-mcp-server
+
+type: mcp-server
+category: automation
+
+requirements:
+  node: ">=18.0.0"
+
+installation:
+  npm: "@illuminaresolutions/n8n-mcp-server"
+
+configuration:
+  env:
+    N8N_HOST:
+      description: "Your n8n instance URL (e.g., https://your-n8n-instance.com)"
+      required: true
+    N8N_API_KEY:
+      description: "Your n8n API key"
+      required: true
+      secret: true
+
+capabilities:
+  - workflow-management
+  - credential-management
+  - execution-monitoring
+  - tag-management
+  - security-audit
+  - user-management
+  - project-management
+  - variable-management
+
+tags:
+  - n8n
+  - automation
+  - workflow
+  - mcp
+  - llm
+  - ai
+  - claude
+
+documentation:
+  getting_started: https://github.com/illuminaresolutions/n8n-mcp-server#installation
+  configuration: https://github.com/illuminaresolutions/n8n-mcp-server#configuration
+  api_reference: https://github.com/illuminaresolutions/n8n-mcp-server/blob/main/N8N_API.yml

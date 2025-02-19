@@ -1,10 +1,48 @@
 {
-  "name": "n8n-mcp-server",
+  "name": "@illuminaresolutions/n8n-mcp-server",
+  "description": "An MCP server that provides access to n8n workflows, executions, credentials, and more through the Model Context Protocol",
   "version": "1.0.0",
   "type": "module",
+  "bin": {
+    "n8n-mcp-server": "build/index.js"
+  },
+  "files": [
+    "build",
+    "README.md",
+    "LICENSE"
+  ],
+  "license": "MIT",
+  "author": "Illuminare Solutions",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/illuminaresolutions/n8n-mcp-server.git"
+  },
+  "bugs": {
+    "url": "https://github.com/illuminaresolutions/n8n-mcp-server/issues"
+  },
+  "homepage": "https://github.com/illuminaresolutions/n8n-mcp-server#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "n8n",
+    "mcp",
+    "automation",
+    "workflow",
+    "llm",
+    "ai",
+    "claude",
+    "modelcontextprotocol"
+  ],
   "scripts": {
-    "build": "tsc",
-    "start": "node build/index.js"
+    "build": "tsc && chmod +x build/index.js",
+    "start": "node build/index.js",
+    "prepublishOnly": "npm run build",
+    "clean": "rm -rf build",
+    "lint": "tsc --noEmit"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^0.7.0",

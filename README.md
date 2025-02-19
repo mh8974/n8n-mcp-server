@@ -15,6 +15,14 @@ An MCP server that provides access to n8n workflows, executions, credentials, an
 
 ### Install the MCP Server
 
+#### Option 1: Install from npm (Recommended)
+
+```bash
+npm install -g @illuminaresolutions/n8n-mcp-server
+```
+
+#### Option 2: Install from Source
+
 1. Clone the repository:
    ```bash
    git clone https://github.com/illuminaresolutions/n8n-mcp-server.git
@@ -37,6 +45,8 @@ An MCP server that provides access to n8n workflows, executions, credentials, an
    pkill -f "node build/index.js"
    ```
 
+Note: When installing from npm, the server will be available as `n8n-mcp-server` in your PATH.
+
 ## Configuration
 
 ### Claude Desktop
@@ -50,9 +60,8 @@ An MCP server that provides access to n8n workflows, executions, credentials, an
    ```json
    {
      "mcpServers": {
-       "n8n": {
-         "command": "node",
-         "args": ["/path/to/n8n-mcp-server/build/index.js"],
+        "n8n": {
+         "command": "n8n-mcp-server",
          "env": {
            "N8N_HOST": "https://your-n8n-instance.com",
            "N8N_API_KEY": "your-api-key-here"
@@ -64,7 +73,7 @@ An MCP server that provides access to n8n workflows, executions, credentials, an
 
 ### Cline (VS Code)
 
-1. Build the server locally (follow Installation steps above)
+1. Install the server (follow Installation steps above)
 2. Open VS Code
 3. Open the Cline extension from the left sidebar
 4. Click the 'MCP Servers' icon at the top of the pane
@@ -74,8 +83,7 @@ An MCP server that provides access to n8n workflows, executions, credentials, an
    {
      "mcpServers": {
        "n8n": {
-         "command": "node",
-         "args": ["/path/to/n8n-mcp-server/build/index.js"],
+         "command": "n8n-mcp-server",
          "env": {
            "N8N_HOST": "https://your-n8n-instance.com",
            "N8N_API_KEY": "your-api-key-here"
