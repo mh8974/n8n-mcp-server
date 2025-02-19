@@ -2,6 +2,7 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
+import fetch from 'node-fetch';
 
 // Type definitions for n8n API responses
 interface N8nUser {
@@ -55,6 +56,44 @@ interface N8nVariable {
 interface N8nVariableList {
   data: N8nVariable[];
   nextCursor?: string;
+}
+
+interface N8nExecution {
+  id: number;
+  data?: any;
+  finished: boolean;
+  mode: string;
+  retryOf?: number;
+  retrySuccessId?: number;
+  startedAt: string;
+  stoppedAt?: string;
+  workflowId: number;
+  waitTill?: string;
+}
+
+interface N8nExecutionList {
+  data: N8nExecution[];
+  nextCursor?: string;
+}
+
+interface N8nTag {
+  id: string;
+  name: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+interface N8nTagList {
+  data: N8nTag[];
+  nextCursor?: string;
+}
+
+interface N8nAuditResult {
+  'Credentials Risk Report'?: any;
+  'Database Risk Report'?: any;
+  'Filesystem Risk Report'?: any;
+  'Nodes Risk Report'?: any;
+  'Instance Risk Report'?: any;
 }
 
 class N8nClient {
@@ -225,6 +264,116 @@ class N8nClient {
     return this.makeRequest<void>(`/variables/${id}`, {
       method: 'DELETE',
     });
+  }
+
+  // Execution management methods
+  async getExecutions(options: { 
+    includeData?: boolean; 
+    status?: 'error' | 'success' | 'waiting';
+    workflowId?: string;
+    limit?: number;
+  } = {}): Promise<N8nExecutionList> {
+    const params = new URLSearchParams();
+    if (options.includeData !== undefined) params.append('includeData', String(options.includeData));
+    if (options.status) params.append('status', options.status);
+    if (options.workflowId) params.append('workflowId', options.workflowId);
+    if (options.limit) params.append('limit', String(options.limit));
+
+    return this.makeRequest<N8nExecutionList>(`/executions?${params.toString()}`);
+  }
+
+  async getExecution(id: number, includeData: boolean = false): Promise<N8nExecution> {
+    const params = new URLSearchParams();
+    if (includeData) params.append('includeData', 'true');
+
+    return this.makeRequest<N8nExecution>(`/executions/${id}?${params.toString()}`);
+  }
+
+  async deleteExecution(id: number): Promise<N8nExecution> {
+    return this.makeRequest<N8nExecution>(`/executions/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Tag management methods
+  async createTag(name: string): Promise<N8nTag> {
+    return this.makeRequest<N8nTag>('/tags', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    });
+  }
+
+  async getTags(options: { limit?: number } = {}): Promise<N8nTagList> {
+    const params = new URLSearchParams();
+    if (options.limit) params.append('limit', String(options.limit));
+
+    return this.makeRequest<N8nTagList>(`/tags?${params.toString()}`);
+  }
+
+  async getTag(id: string): Promise<N8nTag> {
+    return this.makeRequest<N8nTag>(`/tags/${id}`);
+  }
+
+  async updateTag(id: string, name: string): Promise<N8nTag> {
+    return this.makeRequest<N8nTag>(`/tags/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ name }),
+    });
+  }
+
+  async deleteTag(id: string): Promise<N8nTag> {
+    return this.makeRequest<N8nTag>(`/tags/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getWorkflowTags(workflowId: string): Promise<N8nTag[]> {
+    return this.makeRequest<N8nTag[]>(`/workflows/${workflowId}/tags`);
+  }
+
+  async updateWorkflowTags(workflowId: string, tagIds: { id: string }[]): Promise<N8nTag[]> {
+    return this.makeRequest<N8nTag[]>(`/workflows/${workflowId}/tags`, {
+      method: 'PUT',
+      body: JSON.stringify(tagIds),
+    });
+  }
+
+  // Security audit method
+  async generateAudit(options: {
+    daysAbandonedWorkflow?: number;
+    categories?: Array<'credentials' | 'database' | 'nodes' | 'filesystem' | 'instance'>;
+  } = {}): Promise<N8nAuditResult> {
+    return this.makeRequest<N8nAuditResult>('/audit', {
+      method: 'POST',
+      body: JSON.stringify({
+        additionalOptions: {
+          daysAbandonedWorkflow: options.daysAbandonedWorkflow,
+          categories: options.categories,
+        },
+      }),
+    });
+  }
+
+  // Credential management methods
+  async createCredential(name: string, type: string, data: Record<string, any>): Promise<any> {
+    return this.makeRequest('/credentials', {
+      method: 'POST',
+      body: JSON.stringify({
+        name,
+        type,
+        data
+      }),
+    });
+  }
+
+  async deleteCredential(id: string): Promise<any> {
+    return this.makeRequest(`/credentials/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async getCredentialSchema(credentialTypeName: string): Promise<any> {
+    return this.makeRequest(`/credentials/schema/${credentialTypeName}`);
   }
 }
 
@@ -497,6 +646,204 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             id: { type: "string" }
           },
           required: ["clientId", "id"]
+        }
+      },
+      {
+        name: "create-credential",
+        description: "Create a credential that can be used by nodes of the specified type. The credential type name can be found in the n8n UI when creating credentials (e.g., 'cloudflareApi', 'githubApi', 'slackOAuth2Api'). Use get-credential-schema first to see what fields are required for the credential type you want to create.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            clientId: { type: "string" },
+            name: { type: "string" },
+            type: { type: "string" },
+            data: { type: "object" }
+          },
+          required: ["clientId", "name", "type", "data"]
+        }
+      },
+      {
+        name: "delete-credential",
+        description: "Delete a credential by ID. You must be the owner of the credentials.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            clientId: { type: "string" },
+            id: { type: "string" }
+          },
+          required: ["clientId", "id"]
+        }
+      },
+      {
+        name: "get-credential-schema",
+        description: "Show credential data schema for a specific credential type. The credential type name can be found in the n8n UI when creating credentials (e.g., 'cloudflareApi', 'githubApi', 'slackOAuth2Api'). This will show you what fields are required for creating credentials of this type.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            clientId: { type: "string" },
+            credentialTypeName: { type: "string" }
+          },
+          required: ["clientId", "credentialTypeName"]
+        }
+      },
+      // Execution Management Tools
+      {
+        name: "list-executions",
+        description: "Retrieve all executions from your instance with optional filtering.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            clientId: { type: "string" },
+            includeData: { type: "boolean" },
+            status: { 
+              type: "string",
+              enum: ["error", "success", "waiting"]
+            },
+            workflowId: { type: "string" },
+            limit: { type: "number" }
+          },
+          required: ["clientId"]
+        }
+      },
+      {
+        name: "get-execution",
+        description: "Retrieve a specific execution by ID.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            clientId: { type: "string" },
+            id: { type: "number" },
+            includeData: { type: "boolean" }
+          },
+          required: ["clientId", "id"]
+        }
+      },
+      {
+        name: "delete-execution",
+        description: "Delete a specific execution by ID.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            clientId: { type: "string" },
+            id: { type: "number" }
+          },
+          required: ["clientId", "id"]
+        }
+      },
+      // Tag Management Tools
+      {
+        name: "create-tag",
+        description: "Create a new tag in your instance.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            clientId: { type: "string" },
+            name: { type: "string" }
+          },
+          required: ["clientId", "name"]
+        }
+      },
+      {
+        name: "list-tags",
+        description: "Retrieve all tags from your instance.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            clientId: { type: "string" },
+            limit: { type: "number" }
+          },
+          required: ["clientId"]
+        }
+      },
+      {
+        name: "get-tag",
+        description: "Retrieve a specific tag by ID.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            clientId: { type: "string" },
+            id: { type: "string" }
+          },
+          required: ["clientId", "id"]
+        }
+      },
+      {
+        name: "update-tag",
+        description: "Update a tag's name.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            clientId: { type: "string" },
+            id: { type: "string" },
+            name: { type: "string" }
+          },
+          required: ["clientId", "id", "name"]
+        }
+      },
+      {
+        name: "delete-tag",
+        description: "Delete a tag by ID.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            clientId: { type: "string" },
+            id: { type: "string" }
+          },
+          required: ["clientId", "id"]
+        }
+      },
+      {
+        name: "get-workflow-tags",
+        description: "Get tags associated with a workflow.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            clientId: { type: "string" },
+            workflowId: { type: "string" }
+          },
+          required: ["clientId", "workflowId"]
+        }
+      },
+      {
+        name: "update-workflow-tags",
+        description: "Update tags associated with a workflow.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            clientId: { type: "string" },
+            workflowId: { type: "string" },
+            tagIds: {
+              type: "array",
+              items: {
+                type: "object",
+                properties: {
+                  id: { type: "string" }
+                },
+                required: ["id"]
+              }
+            }
+          },
+          required: ["clientId", "workflowId", "tagIds"]
+        }
+      },
+      // Security Audit Tool
+      {
+        name: "generate-audit",
+        description: "Generate a security audit for your n8n instance.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            clientId: { type: "string" },
+            daysAbandonedWorkflow: { type: "number" },
+            categories: {
+              type: "array",
+              items: {
+                type: "string",
+                enum: ["credentials", "database", "nodes", "filesystem", "instance"]
+              }
+            }
+          },
+          required: ["clientId"]
         }
       }
     ]
@@ -946,7 +1293,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         clientId: string; 
         users: Array<{ 
           email: string; 
-          role?: 'global:admin' | 'global:member' 
+          role?: 'global:admin' | 'global:member'
         }> 
       };
       const client = clients.get(clientId);
@@ -1126,6 +1473,475 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [{
             type: "text",
             text: `Successfully deleted variable with ID: ${id}`,
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: error instanceof Error ? error.message : "Unknown error occurred",
+          }],
+          isError: true
+        };
+      }
+    }
+
+    case "create-credential": {
+      const { clientId, name, type, data } = args as {
+        clientId: string;
+        name: string;
+        type: string;
+        data: Record<string, any>;
+      };
+      const client = clients.get(clientId);
+      if (!client) {
+        return {
+          content: [{
+            type: "text",
+            text: "Client not initialized. Please run init-n8n first.",
+          }],
+          isError: true
+        };
+      }
+
+      try {
+        const credential = await client.createCredential(name, type, data);
+        return {
+          content: [{
+            type: "text",
+            text: `Successfully created credential:\n${JSON.stringify(credential, null, 2)}`,
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: error instanceof Error ? error.message : "Unknown error occurred",
+          }],
+          isError: true
+        };
+      }
+    }
+
+    case "delete-credential": {
+      const { clientId, id } = args as { clientId: string; id: string };
+      const client = clients.get(clientId);
+      if (!client) {
+        return {
+          content: [{
+            type: "text",
+            text: "Client not initialized. Please run init-n8n first.",
+          }],
+          isError: true
+        };
+      }
+
+      try {
+        const result = await client.deleteCredential(id);
+        return {
+          content: [{
+            type: "text",
+            text: `Successfully deleted credential:\n${JSON.stringify(result, null, 2)}`,
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: error instanceof Error ? error.message : "Unknown error occurred",
+          }],
+          isError: true
+        };
+      }
+    }
+
+    case "get-credential-schema": {
+      const { clientId, credentialTypeName } = args as { clientId: string; credentialTypeName: string };
+      const client = clients.get(clientId);
+      if (!client) {
+        return {
+          content: [{
+            type: "text",
+            text: "Client not initialized. Please run init-n8n first.",
+          }],
+          isError: true
+        };
+      }
+
+      try {
+        const schema = await client.getCredentialSchema(credentialTypeName);
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(schema, null, 2),
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: error instanceof Error ? error.message : "Unknown error occurred",
+          }],
+          isError: true
+        };
+      }
+    }
+
+    // Execution Management Handlers
+    case "list-executions": {
+      const { clientId, includeData, status, workflowId, limit } = args as {
+        clientId: string;
+        includeData?: boolean;
+        status?: 'error' | 'success' | 'waiting';
+        workflowId?: string;
+        limit?: number;
+      };
+      const client = clients.get(clientId);
+      if (!client) {
+        return {
+          content: [{
+            type: "text",
+            text: "Client not initialized. Please run init-n8n first.",
+          }],
+          isError: true
+        };
+      }
+
+      try {
+        const executions = await client.getExecutions({ includeData, status, workflowId, limit });
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(executions.data, null, 2),
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: error instanceof Error ? error.message : "Unknown error occurred",
+          }],
+          isError: true
+        };
+      }
+    }
+
+    case "get-execution": {
+      const { clientId, id, includeData } = args as { clientId: string; id: number; includeData?: boolean };
+      const client = clients.get(clientId);
+      if (!client) {
+        return {
+          content: [{
+            type: "text",
+            text: "Client not initialized. Please run init-n8n first.",
+          }],
+          isError: true
+        };
+      }
+
+      try {
+        const execution = await client.getExecution(id, includeData);
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(execution, null, 2),
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: error instanceof Error ? error.message : "Unknown error occurred",
+          }],
+          isError: true
+        };
+      }
+    }
+
+    case "delete-execution": {
+      const { clientId, id } = args as { clientId: string; id: number };
+      const client = clients.get(clientId);
+      if (!client) {
+        return {
+          content: [{
+            type: "text",
+            text: "Client not initialized. Please run init-n8n first.",
+          }],
+          isError: true
+        };
+      }
+
+      try {
+        const execution = await client.deleteExecution(id);
+        return {
+          content: [{
+            type: "text",
+            text: `Successfully deleted execution:\n${JSON.stringify(execution, null, 2)}`,
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: error instanceof Error ? error.message : "Unknown error occurred",
+          }],
+          isError: true
+        };
+      }
+    }
+
+    // Tag Management Handlers
+    case "create-tag": {
+      const { clientId, name } = args as { clientId: string; name: string };
+      const client = clients.get(clientId);
+      if (!client) {
+        return {
+          content: [{
+            type: "text",
+            text: "Client not initialized. Please run init-n8n first.",
+          }],
+          isError: true
+        };
+      }
+
+      try {
+        const tag = await client.createTag(name);
+        return {
+          content: [{
+            type: "text",
+            text: `Successfully created tag:\n${JSON.stringify(tag, null, 2)}`,
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: error instanceof Error ? error.message : "Unknown error occurred",
+          }],
+          isError: true
+        };
+      }
+    }
+
+    case "list-tags": {
+      const { clientId, limit } = args as { clientId: string; limit?: number };
+      const client = clients.get(clientId);
+      if (!client) {
+        return {
+          content: [{
+            type: "text",
+            text: "Client not initialized. Please run init-n8n first.",
+          }],
+          isError: true
+        };
+      }
+
+      try {
+        const tags = await client.getTags({ limit });
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(tags.data, null, 2),
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: error instanceof Error ? error.message : "Unknown error occurred",
+          }],
+          isError: true
+        };
+      }
+    }
+
+    case "get-tag": {
+      const { clientId, id } = args as { clientId: string; id: string };
+      const client = clients.get(clientId);
+      if (!client) {
+        return {
+          content: [{
+            type: "text",
+            text: "Client not initialized. Please run init-n8n first.",
+          }],
+          isError: true
+        };
+      }
+
+      try {
+        const tag = await client.getTag(id);
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(tag, null, 2),
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: error instanceof Error ? error.message : "Unknown error occurred",
+          }],
+          isError: true
+        };
+      }
+    }
+
+    case "update-tag": {
+      const { clientId, id, name } = args as { clientId: string; id: string; name: string };
+      const client = clients.get(clientId);
+      if (!client) {
+        return {
+          content: [{
+            type: "text",
+            text: "Client not initialized. Please run init-n8n first.",
+          }],
+          isError: true
+        };
+      }
+
+      try {
+        const tag = await client.updateTag(id, name);
+        return {
+          content: [{
+            type: "text",
+            text: `Successfully updated tag:\n${JSON.stringify(tag, null, 2)}`,
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: error instanceof Error ? error.message : "Unknown error occurred",
+          }],
+          isError: true
+        };
+      }
+    }
+
+    case "delete-tag": {
+      const { clientId, id } = args as { clientId: string; id: string };
+      const client = clients.get(clientId);
+      if (!client) {
+        return {
+          content: [{
+            type: "text",
+            text: "Client not initialized. Please run init-n8n first.",
+          }],
+          isError: true
+        };
+      }
+
+      try {
+        const tag = await client.deleteTag(id);
+        return {
+          content: [{
+            type: "text",
+            text: `Successfully deleted tag:\n${JSON.stringify(tag, null, 2)}`,
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: error instanceof Error ? error.message : "Unknown error occurred",
+          }],
+          isError: true
+        };
+      }
+    }
+
+    case "get-workflow-tags": {
+      const { clientId, workflowId } = args as { clientId: string; workflowId: string };
+      const client = clients.get(clientId);
+      if (!client) {
+        return {
+          content: [{
+            type: "text",
+            text: "Client not initialized. Please run init-n8n first.",
+          }],
+          isError: true
+        };
+      }
+
+      try {
+        const tags = await client.getWorkflowTags(workflowId);
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(tags, null, 2),
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: error instanceof Error ? error.message : "Unknown error occurred",
+          }],
+          isError: true
+        };
+      }
+    }
+
+    case "update-workflow-tags": {
+      const { clientId, workflowId, tagIds } = args as {
+        clientId: string;
+        workflowId: string;
+        tagIds: { id: string }[];
+      };
+      const client = clients.get(clientId);
+      if (!client) {
+        return {
+          content: [{
+            type: "text",
+            text: "Client not initialized. Please run init-n8n first.",
+          }],
+          isError: true
+        };
+      }
+
+      try {
+        const tags = await client.updateWorkflowTags(workflowId, tagIds);
+        return {
+          content: [{
+            type: "text",
+            text: `Successfully updated workflow tags:\n${JSON.stringify(tags, null, 2)}`,
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: error instanceof Error ? error.message : "Unknown error occurred",
+          }],
+          isError: true
+        };
+      }
+    }
+
+    case "generate-audit": {
+      const { clientId, daysAbandonedWorkflow, categories } = args as {
+        clientId: string;
+        daysAbandonedWorkflow?: number;
+        categories?: Array<'credentials' | 'database' | 'nodes' | 'filesystem' | 'instance'>;
+      };
+      const client = clients.get(clientId);
+      if (!client) {
+        return {
+          content: [{
+            type: "text",
+            text: "Client not initialized. Please run init-n8n first.",
+          }],
+          isError: true
+        };
+      }
+
+      try {
+        const audit = await client.generateAudit({ daysAbandonedWorkflow, categories });
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(audit, null, 2),
           }]
         };
       } catch (error) {
