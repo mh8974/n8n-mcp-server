@@ -45,6 +45,18 @@ interface N8nProjectList {
   nextCursor?: string;
 }
 
+interface N8nVariable {
+  id: string;
+  key: string;
+  value: string;
+  type?: string;
+}
+
+interface N8nVariableList {
+  data: N8nVariable[];
+  nextCursor?: string;
+}
+
 class N8nClient {
   constructor(
     private baseUrl: string,
@@ -193,6 +205,24 @@ class N8nClient {
 
   async deleteUser(idOrEmail: string): Promise<void> {
     return this.makeRequest<void>(`/users/${idOrEmail}`, {
+      method: 'DELETE',
+    });
+  }
+
+  // Variable management methods
+  async listVariables(): Promise<N8nVariableList> {
+    return this.makeRequest<N8nVariableList>('/variables');
+  }
+
+  async createVariable(key: string, value: string): Promise<void> {
+    return this.makeRequest<void>('/variables', {
+      method: 'POST',
+      body: JSON.stringify({ key, value }),
+    });
+  }
+
+  async deleteVariable(id: string): Promise<void> {
+    return this.makeRequest<void>(`/variables/${id}`, {
       method: 'DELETE',
     });
   }
@@ -431,6 +461,42 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             idOrEmail: { type: "string" }
           },
           required: ["clientId", "idOrEmail"]
+        }
+      },
+      {
+        name: "list-variables",
+        description: "List all variables from n8n. NOTE: Requires n8n Enterprise license with variable management features enabled. Use after init-n8n to see available variables. IMPORTANT: Arguments must be provided as compact, single-line JSON without whitespace or newlines.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            clientId: { type: "string" }
+          },
+          required: ["clientId"]
+        }
+      },
+      {
+        name: "create-variable",
+        description: "Create a new variable in n8n. NOTE: Requires n8n Enterprise license with variable management features enabled. Variables can be used across workflows to store and share data. IMPORTANT: Arguments must be provided as compact, single-line JSON without whitespace or newlines.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            clientId: { type: "string" },
+            key: { type: "string" },
+            value: { type: "string" }
+          },
+          required: ["clientId", "key", "value"]
+        }
+      },
+      {
+        name: "delete-variable",
+        description: "Delete a variable by ID. NOTE: Requires n8n Enterprise license with variable management features enabled. Use after list-variables to get the ID of the variable to delete. This action cannot be undone. IMPORTANT: Arguments must be provided as compact, single-line JSON without whitespace or newlines.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            clientId: { type: "string" },
+            id: { type: "string" }
+          },
+          required: ["clientId", "id"]
         }
       }
     ]
@@ -964,6 +1030,102 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [{
             type: "text",
             text: `Successfully deleted user: ${idOrEmail}`,
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: error instanceof Error ? error.message : "Unknown error occurred",
+          }],
+          isError: true
+        };
+      }
+    }
+
+    case "list-variables": {
+      const { clientId } = args as { clientId: string };
+      const client = clients.get(clientId);
+      if (!client) {
+        return {
+          content: [{
+            type: "text",
+            text: "Client not initialized. Please run init-n8n first.",
+          }],
+          isError: true
+        };
+      }
+
+      try {
+        const variables = await client.listVariables();
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(variables.data, null, 2),
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: error instanceof Error ? error.message : "Unknown error occurred",
+          }],
+          isError: true
+        };
+      }
+    }
+
+    case "create-variable": {
+      const { clientId, key, value } = args as { clientId: string; key: string; value: string };
+      const client = clients.get(clientId);
+      if (!client) {
+        return {
+          content: [{
+            type: "text",
+            text: "Client not initialized. Please run init-n8n first.",
+          }],
+          isError: true
+        };
+      }
+
+      try {
+        await client.createVariable(key, value);
+        return {
+          content: [{
+            type: "text",
+            text: `Successfully created variable with key: ${key}`,
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: error instanceof Error ? error.message : "Unknown error occurred",
+          }],
+          isError: true
+        };
+      }
+    }
+
+    case "delete-variable": {
+      const { clientId, id } = args as { clientId: string; id: string };
+      const client = clients.get(clientId);
+      if (!client) {
+        return {
+          content: [{
+            type: "text",
+            text: "Client not initialized. Please run init-n8n first.",
+          }],
+          isError: true
+        };
+      }
+
+      try {
+        await client.deleteVariable(id);
+        return {
+          content: [{
+            type: "text",
+            text: `Successfully deleted variable with ID: ${id}`,
           }]
         };
       } catch (error) {

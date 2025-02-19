@@ -18,7 +18,7 @@ An MCP server that provides access to n8n workflows, executions, credentials, an
 - Node.js 16 or higher
 - An n8n instance with API access
 - n8n API key with appropriate permissions
-- n8n Enterprise license (for project management features)
+- n8n Enterprise license (for project management and variable management features)
 
 ### Using npm
 
@@ -124,6 +124,13 @@ cline config set-env n8n N8N_API_KEY your-api-key-here
 
 Note: Project management features require an n8n Enterprise license with project management capabilities enabled.
 
+### Variable Management (Enterprise Feature)
+- List all variables in your n8n instance
+- Create new variables with key-value pairs
+- Delete variables by ID
+
+Note: Variable management features require an n8n Enterprise license with variable management capabilities enabled.
+
 ## Important Usage Notes
 
 When using the MCP tools, keep in mind these critical requirements:
@@ -146,8 +153,8 @@ When using the MCP tools, keep in mind these critical requirements:
      ```
 
 3. **Enterprise Features**
-   - Project management features require an n8n Enterprise license
-   - Attempting to use project management features without an Enterprise license will result in clear error messages
+   - Project management and variable management features require an n8n Enterprise license
+   - Attempting to use Enterprise features without a license will result in clear error messages
    - The base workflow management features remain available without the Enterprise license
 
 ## What Not To Do
