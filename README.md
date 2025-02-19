@@ -104,6 +104,30 @@ cline config set-env n8n N8N_API_KEY your-api-key-here
 - Manage workflow execution
 - Retrieve a workflow by ID
 - Update an existing workflow
+- Delete a workflow by its ID
+- Activate a workflow by its ID
+- Deactivate a workflow by its ID
+
+## Important Usage Notes
+
+When using the MCP tools, keep in mind these critical requirements:
+
+1. **JSON Formatting**
+   - All tool arguments must be provided as compact, single-line JSON without whitespace or newlines
+   - Example: `{"clientId":"abc123","id":"workflow123"}`
+
+2. **Workflow Creation**
+   - Must provide full workflow structure including nodes and connections arrays, even if empty
+   - The 'active' property is read-only and should not be included
+   - Example:
+     ```json
+     {
+       "clientId": "abc123",
+       "name": "My Workflow",
+       "nodes": [],
+       "connections": {}
+     }
+     ```
 
 ## What Not To Do
 
@@ -135,11 +159,6 @@ When developing MCP servers, avoid these common mistakes:
 ## Roadmap
 
 The following features are planned for future releases:
-
-### Workflow Management
-- Delete a workflow by its ID
-- Activate a workflow by its ID
-- Deactivate a workflow by its ID
 
 ### Execution Management
 - Retrieve all executions

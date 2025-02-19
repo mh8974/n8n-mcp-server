@@ -73,7 +73,6 @@ class N8nClient {
         name,
         nodes,
         connections,
-        active: false, // Default to inactive for safety
         settings: {
           saveManualExecutions: true,
           saveExecutionProgress: true,
@@ -86,6 +85,24 @@ class N8nClient {
     return this.makeRequest<N8nWorkflow>(`/workflows/${id}`, {
       method: 'PUT',
       body: JSON.stringify(workflow),
+    });
+  }
+
+  async deleteWorkflow(id: string): Promise<N8nWorkflow> {
+    return this.makeRequest<N8nWorkflow>(`/workflows/${id}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async activateWorkflow(id: string): Promise<N8nWorkflow> {
+    return this.makeRequest<N8nWorkflow>(`/workflows/${id}/activate`, {
+      method: 'POST',
+    });
+  }
+
+  async deactivateWorkflow(id: string): Promise<N8nWorkflow> {
+    return this.makeRequest<N8nWorkflow>(`/workflows/${id}/deactivate`, {
+      method: 'POST',
     });
   }
 }
@@ -112,7 +129,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: "init-n8n",
-        description: "Initialize connection to n8n instance. Use this tool whenever an n8n URL and API key are shared to establish the connection.",
+        description: "Initialize connection to n8n instance. Use this tool whenever an n8n URL and API key are shared to establish the connection. IMPORTANT: Arguments must be provided as compact, single-line JSON without whitespace or newlines.",
         inputSchema: {
           type: "object",
           properties: {
@@ -124,7 +141,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "list-workflows",
-        description: "List all workflows from n8n. Use after init-n8n to see available workflows.",
+        description: "List all workflows from n8n. Use after init-n8n to see available workflows. IMPORTANT: Arguments must be provided as compact, single-line JSON without whitespace or newlines.",
         inputSchema: {
           type: "object",
           properties: {
@@ -135,7 +152,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "get-workflow",
-        description: "Retrieve a workflow by ID. Use after list-workflows to get detailed information about a specific workflow.",
+        description: "Retrieve a workflow by ID. Use after list-workflows to get detailed information about a specific workflow. IMPORTANT: Arguments must be provided as compact, single-line JSON without whitespace or newlines.",
         inputSchema: {
           type: "object",
           properties: {
@@ -147,7 +164,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "create-workflow",
-        description: "Create a new workflow in n8n. Use to set up a new workflow with optional nodes and connections.",
+        description: "Create a new workflow in n8n. Use to set up a new workflow with optional nodes and connections. IMPORTANT: 1) Arguments must be provided as compact, single-line JSON without whitespace or newlines. 2) Must provide full workflow structure including nodes and connections arrays, even if empty. The 'active' property should not be included as it is read-only.",
         inputSchema: {
           type: "object",
           properties: {
@@ -161,7 +178,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "update-workflow",
-        description: "Update an existing workflow in n8n. Use after get-workflow to modify a workflow's properties, nodes, or connections.",
+        description: "Update an existing workflow in n8n. Use after get-workflow to modify a workflow's properties, nodes, or connections. IMPORTANT: Arguments must be provided as compact, single-line JSON without whitespace or newlines.",
         inputSchema: {
           type: "object",
           properties: {
@@ -179,6 +196,42 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             }
           },
           required: ["clientId", "id", "workflow"]
+        }
+      },
+      {
+        name: "delete-workflow",
+        description: "Delete a workflow by ID. This action cannot be undone. IMPORTANT: Arguments must be provided as compact, single-line JSON without whitespace or newlines.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            clientId: { type: "string" },
+            id: { type: "string" }
+          },
+          required: ["clientId", "id"]
+        }
+      },
+      {
+        name: "activate-workflow",
+        description: "Activate a workflow by ID. This will enable the workflow to run. IMPORTANT: Arguments must be provided as compact, single-line JSON without whitespace or newlines.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            clientId: { type: "string" },
+            id: { type: "string" }
+          },
+          required: ["clientId", "id"]
+        }
+      },
+      {
+        name: "deactivate-workflow",
+        description: "Deactivate a workflow by ID. This will prevent the workflow from running. IMPORTANT: Arguments must be provided as compact, single-line JSON without whitespace or newlines.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            clientId: { type: "string" },
+            id: { type: "string" }
+          },
+          required: ["clientId", "id"]
         }
       }
     ]
@@ -354,6 +407,102 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [{
             type: "text",
             text: `Successfully created workflow:\n${JSON.stringify(workflow, null, 2)}`,
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: error instanceof Error ? error.message : "Unknown error occurred",
+          }],
+          isError: true
+        };
+      }
+    }
+
+    case "delete-workflow": {
+      const { clientId, id } = args as { clientId: string; id: string };
+      const client = clients.get(clientId);
+      if (!client) {
+        return {
+          content: [{
+            type: "text",
+            text: "Client not initialized. Please run init-n8n first.",
+          }],
+          isError: true
+        };
+      }
+
+      try {
+        const workflow = await client.deleteWorkflow(id);
+        return {
+          content: [{
+            type: "text",
+            text: `Successfully deleted workflow:\n${JSON.stringify(workflow, null, 2)}`,
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: error instanceof Error ? error.message : "Unknown error occurred",
+          }],
+          isError: true
+        };
+      }
+    }
+
+    case "activate-workflow": {
+      const { clientId, id } = args as { clientId: string; id: string };
+      const client = clients.get(clientId);
+      if (!client) {
+        return {
+          content: [{
+            type: "text",
+            text: "Client not initialized. Please run init-n8n first.",
+          }],
+          isError: true
+        };
+      }
+
+      try {
+        const workflow = await client.activateWorkflow(id);
+        return {
+          content: [{
+            type: "text",
+            text: `Successfully activated workflow:\n${JSON.stringify(workflow, null, 2)}`,
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: error instanceof Error ? error.message : "Unknown error occurred",
+          }],
+          isError: true
+        };
+      }
+    }
+
+    case "deactivate-workflow": {
+      const { clientId, id } = args as { clientId: string; id: string };
+      const client = clients.get(clientId);
+      if (!client) {
+        return {
+          content: [{
+            type: "text",
+            text: "Client not initialized. Please run init-n8n first.",
+          }],
+          isError: true
+        };
+      }
+
+      try {
+        const workflow = await client.deactivateWorkflow(id);
+        return {
+          content: [{
+            type: "text",
+            text: `Successfully deactivated workflow:\n${JSON.stringify(workflow, null, 2)}`,
           }]
         };
       } catch (error) {
