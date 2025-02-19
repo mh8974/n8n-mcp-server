@@ -8,7 +8,7 @@ An MCP server that provides access to n8n workflows, executions, credentials, an
 - List all workflows in your n8n instance
 - View workflow details including nodes, connections, and settings
 - Execute workflows and monitor their status
-- Manage users, credentials, tags, and projects
+- Manage users, credentials, tags, and projects (Enterprise features)
 - Secure access through n8n API key authentication
 
 ## Installation
@@ -18,6 +18,7 @@ An MCP server that provides access to n8n workflows, executions, credentials, an
 - Node.js 16 or higher
 - An n8n instance with API access
 - n8n API key with appropriate permissions
+- n8n Enterprise license (for project management features)
 
 ### Using npm
 
@@ -98,6 +99,7 @@ cline config set-env n8n N8N_API_KEY your-api-key-here
 
 ## Current Features
 
+### Workflow Management
 - List all workflows in your n8n instance
 - View detailed workflow information
 - Check workflow status
@@ -107,6 +109,14 @@ cline config set-env n8n N8N_API_KEY your-api-key-here
 - Delete a workflow by its ID
 - Activate a workflow by its ID
 - Deactivate a workflow by its ID
+
+### Project Management (Enterprise Feature)
+- List all projects in your n8n instance
+- Create new projects
+- Delete projects by ID
+- Update project names
+
+Note: Project management features require an n8n Enterprise license with project management capabilities enabled.
 
 ## Important Usage Notes
 
@@ -128,6 +138,11 @@ When using the MCP tools, keep in mind these critical requirements:
        "connections": {}
      }
      ```
+
+3. **Enterprise Features**
+   - Project management features require an n8n Enterprise license
+   - Attempting to use project management features without an Enterprise license will result in clear error messages
+   - The base workflow management features remain available without the Enterprise license
 
 ## What Not To Do
 
@@ -182,12 +197,6 @@ The following features are planned for future releases:
 - Retrieve a tag
 - Delete a tag
 - Update a tag
-
-### Project Management
-- Create a project
-- Retrieve projects
-- Delete a project
-- Update a project
 
 ## Contributing
 

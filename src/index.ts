@@ -18,6 +18,17 @@ interface N8nWorkflowList {
   nextCursor?: string;
 }
 
+interface N8nProject {
+  id: string;
+  name: string;
+  type?: string;
+}
+
+interface N8nProjectList {
+  data: N8nProject[];
+  nextCursor?: string;
+}
+
 class N8nClient {
   constructor(
     private baseUrl: string,
@@ -45,8 +56,20 @@ class N8nClient {
       });
 
       if (!response.ok) {
-        const error = await response.text();
-        throw new Error(`N8N API error: ${error}`);
+        const errorText = await response.text();
+        let errorMessage: string;
+        try {
+          const errorJson = JSON.parse(errorText);
+          // Check for license-related errors
+          if (errorJson.message && errorJson.message.includes('license')) {
+            errorMessage = `This operation requires an n8n Enterprise license with project management features enabled. Error: ${errorJson.message}`;
+          } else {
+            errorMessage = errorJson.message || errorText;
+          }
+        } catch {
+          errorMessage = errorText;
+        }
+        throw new Error(`N8N API error: ${errorMessage}`);
       }
 
       return await response.json() as T;
@@ -103,6 +126,31 @@ class N8nClient {
   async deactivateWorkflow(id: string): Promise<N8nWorkflow> {
     return this.makeRequest<N8nWorkflow>(`/workflows/${id}/deactivate`, {
       method: 'POST',
+    });
+  }
+
+  // Project management methods (requires n8n Enterprise license)
+  async listProjects(): Promise<N8nProjectList> {
+    return this.makeRequest<N8nProjectList>('/projects');
+  }
+
+  async createProject(name: string): Promise<void> {
+    return this.makeRequest<void>('/projects', {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+    });
+  }
+
+  async deleteProject(projectId: string): Promise<void> {
+    return this.makeRequest<void>(`/projects/${projectId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  async updateProject(projectId: string, name: string): Promise<void> {
+    return this.makeRequest<void>(`/projects/${projectId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ name }),
     });
   }
 }
@@ -232,6 +280,54 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             id: { type: "string" }
           },
           required: ["clientId", "id"]
+        }
+      },
+      {
+        name: "list-projects",
+        description: "List all projects from n8n. NOTE: Requires n8n Enterprise license with project management features enabled. IMPORTANT: Arguments must be provided as compact, single-line JSON without whitespace or newlines.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            clientId: { type: "string" }
+          },
+          required: ["clientId"]
+        }
+      },
+      {
+        name: "create-project",
+        description: "Create a new project in n8n. NOTE: Requires n8n Enterprise license with project management features enabled. IMPORTANT: Arguments must be provided as compact, single-line JSON without whitespace or newlines.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            clientId: { type: "string" },
+            name: { type: "string" }
+          },
+          required: ["clientId", "name"]
+        }
+      },
+      {
+        name: "delete-project",
+        description: "Delete a project by ID. NOTE: Requires n8n Enterprise license with project management features enabled. IMPORTANT: Arguments must be provided as compact, single-line JSON without whitespace or newlines.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            clientId: { type: "string" },
+            projectId: { type: "string" }
+          },
+          required: ["clientId", "projectId"]
+        }
+      },
+      {
+        name: "update-project",
+        description: "Update a project's name. NOTE: Requires n8n Enterprise license with project management features enabled. IMPORTANT: Arguments must be provided as compact, single-line JSON without whitespace or newlines.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            clientId: { type: "string" },
+            projectId: { type: "string" },
+            name: { type: "string" }
+          },
+          required: ["clientId", "projectId", "name"]
         }
       }
     ]
@@ -503,6 +599,134 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [{
             type: "text",
             text: `Successfully deactivated workflow:\n${JSON.stringify(workflow, null, 2)}`,
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: error instanceof Error ? error.message : "Unknown error occurred",
+          }],
+          isError: true
+        };
+      }
+    }
+
+    case "list-projects": {
+      const { clientId } = args as { clientId: string };
+      const client = clients.get(clientId);
+      if (!client) {
+        return {
+          content: [{
+            type: "text",
+            text: "Client not initialized. Please run init-n8n first.",
+          }],
+          isError: true
+        };
+      }
+
+      try {
+        const projects = await client.listProjects();
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(projects.data, null, 2),
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: error instanceof Error ? error.message : "Unknown error occurred",
+          }],
+          isError: true
+        };
+      }
+    }
+
+    case "create-project": {
+      const { clientId, name } = args as { clientId: string; name: string };
+      const client = clients.get(clientId);
+      if (!client) {
+        return {
+          content: [{
+            type: "text",
+            text: "Client not initialized. Please run init-n8n first.",
+          }],
+          isError: true
+        };
+      }
+
+      try {
+        await client.createProject(name);
+        return {
+          content: [{
+            type: "text",
+            text: `Successfully created project: ${name}`,
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: error instanceof Error ? error.message : "Unknown error occurred",
+          }],
+          isError: true
+        };
+      }
+    }
+
+    case "delete-project": {
+      const { clientId, projectId } = args as { clientId: string; projectId: string };
+      const client = clients.get(clientId);
+      if (!client) {
+        return {
+          content: [{
+            type: "text",
+            text: "Client not initialized. Please run init-n8n first.",
+          }],
+          isError: true
+        };
+      }
+
+      try {
+        await client.deleteProject(projectId);
+        return {
+          content: [{
+            type: "text",
+            text: `Successfully deleted project with ID: ${projectId}`,
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: error instanceof Error ? error.message : "Unknown error occurred",
+          }],
+          isError: true
+        };
+      }
+    }
+
+    case "update-project": {
+      const { clientId, projectId, name } = args as { clientId: string; projectId: string; name: string };
+      const client = clients.get(clientId);
+      if (!client) {
+        return {
+          content: [{
+            type: "text",
+            text: "Client not initialized. Please run init-n8n first.",
+          }],
+          isError: true
+        };
+      }
+
+      try {
+        await client.updateProject(projectId, name);
+        return {
+          content: [{
+            type: "text",
+            text: `Successfully updated project ${projectId} with new name: ${name}`,
           }]
         };
       } catch (error) {
