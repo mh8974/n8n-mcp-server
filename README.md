@@ -163,4 +163,4 @@ These features require an n8n Enterprise license:
 
 ## License
 
-[MIT License](https://github.com/illuminaresolutions/n8n-mcp-server/blob/main/LICENSE)
+[MIT License](LICENSE)
