@@ -103,6 +103,30 @@ cline config set-env n8n N8N_API_KEY your-api-key-here
 - Check workflow status
 - Manage workflow execution
 
+## What Not To Do
+
+When developing MCP servers, avoid these common mistakes:
+
+1. **Don't Overcomplicate the Implementation**
+   - Keep the codebase simple - just expand src/index.ts as needed
+   - Avoid creating complex directory structures
+   - Focus on implementing core functionality first
+
+2. **Don't Create Planning Documents for Unimplemented Features**
+   - Only document features that are actually implemented and working
+   - Avoid maintaining documentation for planned features that don't exist yet
+   - Don't commit planning documents as if they were implementation details
+
+3. **Keep It Simple**
+   - Don't try to support every possible use case from the start
+   - Add new features only when they're fully designed and ready to implement
+   - The github repo's simple approach is correct and should be followed
+
+4. **Focus on What Works**
+   - Document only what is actually implemented and working
+   - Don't include "roadmap" sections for planned features
+   - Keep documentation clear and focused on current functionality
+
 ## Roadmap
 
 The following features are planned for future releases:
