@@ -2,24 +2,40 @@
 
 An MCP server that provides access to n8n workflows, executions, credentials, and more through the Model Context Protocol. This allows Large Language Models (LLMs) to interact with n8n instances in a secure and standardized way.
 
-## Quick Start
+## Installation
 
-The n8n MCP server can be used with any LLM application that supports the Model Context Protocol. Here's how to get started:
+### Get your n8n API Key
 
-1. Get your n8n API key from your n8n instance
-2. Add the configuration to your LLM application (see below)
-3. Start the MCP server in the background:
+1. Log into your n8n instance
+2. Click your user icon in the bottom left
+3. Go to Settings
+4. Select API
+5. Click "Create API Key"
+6. Copy your API key (you won't be able to see it again)
+
+### Install the MCP Server
+
+1. Clone the repository:
    ```bash
+   git clone https://github.com/illuminaresolutions/n8n-mcp-server.git
+   cd n8n-mcp-server
+   ```
+
+2. Install dependencies and build:
+   ```bash
+   npm install
    npm run build
+   ```
+
+3. Start the server in the background:
+   ```bash
    nohup npm start > n8n-mcp.log 2>&1 &
    ```
-4. Restart your LLM application
-5. Test with "List my n8n workflows"
 
-Note: The server will run in the background and log to n8n-mcp.log. To stop it:
-```bash
-pkill -f "node build/index.js"
-```
+   To stop the server:
+   ```bash
+   pkill -f "node build/index.js"
+   ```
 
 ## Configuration
 
@@ -35,8 +51,8 @@ pkill -f "node build/index.js"
    {
      "mcpServers": {
        "n8n": {
-         "command": "npx",
-         "args": ["-y", "@illuminaresolutions/n8n-mcp-server"],
+         "command": "node",
+         "args": ["/path/to/n8n-mcp-server/build/index.js"],
          "env": {
            "N8N_HOST": "https://your-n8n-instance.com",
            "N8N_API_KEY": "your-api-key-here"
@@ -48,37 +64,41 @@ pkill -f "node build/index.js"
 
 ### Cline (VS Code)
 
-```bash
-# Add the server
-cline config add-server n8n npx -y @illuminaresolutions/n8n-mcp-server
-
-# Set environment variables
-cline config set-env n8n N8N_HOST https://your-n8n-instance.com
-cline config set-env n8n N8N_API_KEY your-api-key-here
-```
+1. Build the server locally (follow Installation steps above)
+2. Open VS Code
+3. Open the Cline extension from the left sidebar
+4. Click the 'MCP Servers' icon at the top of the pane
+5. Scroll to bottom and click 'Configure MCP Servers'
+6. Add to the opened settings file:
+   ```json
+   {
+     "mcpServers": {
+       "n8n": {
+         "command": "node",
+         "args": ["/path/to/n8n-mcp-server/build/index.js"],
+         "env": {
+           "N8N_HOST": "https://your-n8n-instance.com",
+           "N8N_API_KEY": "your-api-key-here"
+         }
+       }
+     }
+   }
+   ```
+7. Save the file
+8. Ensure the MCP toggle is enabled (green) and the status indicator is green
+9. Start using MCP commands in Cline
 
 ### Sage
 
-Add to `~/Library/Application Support/Sage/sage_config.json`:
+Coming soon! The n8n MCP server will be available through:
+- Smithery.ai marketplace
+- Import from Claude Desktop
 
-```json
-{
-  "mcpServers": {
-    "n8n": {
-      "command": "npx",
-      "args": ["-y", "@illuminaresolutions/n8n-mcp-server"],
-      "env": {
-        "N8N_HOST": "https://your-n8n-instance.com",
-        "N8N_API_KEY": "your-api-key-here"
-      }
-    }
-  }
-}
-```
+For now, please use Claude Desktop or Cline.
 
 ## Validation
 
-After adding the configuration:
+After configuration:
 
 1. Restart your LLM application
 2. Ask: "List my n8n workflows"
@@ -97,13 +117,14 @@ If you get an error:
 - Execute workflows
 - Manage credentials
 - Handle tags and executions
+- Generate security audits
+- Manage workflow tags
 
 ### Enterprise Features
 These features require an n8n Enterprise license:
 - Project management
 - Variable management
 - Advanced user management
-- Security audit capabilities
 
 ## Troubleshooting
 
@@ -122,18 +143,6 @@ These features require an n8n Enterprise license:
    - Verify n8n instance is running
    - Check URL protocol (http/https)
    - Remove trailing slash from N8N_HOST
-
-### Debug Mode
-
-Enable debug logging:
-
-```bash
-# Claude Desktop/Sage
-Add "debug": true to config file
-
-# Cline
-cline config set-env n8n DEBUG true
-```
 
 ## Security Best Practices
 
@@ -154,4 +163,4 @@ cline config set-env n8n DEBUG true
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file
+[MIT License](https://github.com/illuminaresolutions/n8n-mcp-server/blob/main/LICENSE)
