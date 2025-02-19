@@ -2,7 +2,6 @@ import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { ListToolsRequestSchema, CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod";
-import fetch from 'node-fetch';
 
 // Type definitions for n8n API responses
 interface N8nWorkflow {
@@ -63,6 +62,10 @@ class N8nClient {
     return this.makeRequest<N8nWorkflowList>('/workflows');
   }
 
+  async getWorkflow(id: string): Promise<N8nWorkflow> {
+    return this.makeRequest<N8nWorkflow>(`/workflows/${id}`);
+  }
+
   async createWorkflow(name: string, nodes: any[] = [], connections: any = {}): Promise<N8nWorkflow> {
     return this.makeRequest<N8nWorkflow>('/workflows', {
       method: 'POST',
@@ -76,6 +79,13 @@ class N8nClient {
           saveExecutionProgress: true,
         },
       }),
+    });
+  }
+
+  async updateWorkflow(id: string, workflow: Partial<N8nWorkflow>): Promise<N8nWorkflow> {
+    return this.makeRequest<N8nWorkflow>(`/workflows/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(workflow),
     });
   }
 }
@@ -102,7 +112,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
     tools: [
       {
         name: "init-n8n",
-        description: "Initialize connection to n8n instance",
+        description: "Initialize connection to n8n instance. Use this tool whenever an n8n URL and API key are shared to establish the connection.",
         inputSchema: {
           type: "object",
           properties: {
@@ -114,7 +124,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "list-workflows",
-        description: "List all workflows from n8n",
+        description: "List all workflows from n8n. Use after init-n8n to see available workflows.",
         inputSchema: {
           type: "object",
           properties: {
@@ -124,8 +134,20 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
         }
       },
       {
+        name: "get-workflow",
+        description: "Retrieve a workflow by ID. Use after list-workflows to get detailed information about a specific workflow.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            clientId: { type: "string" },
+            id: { type: "string" }
+          },
+          required: ["clientId", "id"]
+        }
+      },
+      {
         name: "create-workflow",
-        description: "Create a new workflow in n8n",
+        description: "Create a new workflow in n8n. Use to set up a new workflow with optional nodes and connections.",
         inputSchema: {
           type: "object",
           properties: {
@@ -135,6 +157,28 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             connections: { type: "object" }
           },
           required: ["clientId", "name"]
+        }
+      },
+      {
+        name: "update-workflow",
+        description: "Update an existing workflow in n8n. Use after get-workflow to modify a workflow's properties, nodes, or connections.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            clientId: { type: "string" },
+            id: { type: "string" },
+            workflow: {
+              type: "object",
+              properties: {
+                name: { type: "string" },
+                active: { type: "boolean" },
+                nodes: { type: "array" },
+                connections: { type: "object" },
+                settings: { type: "object" }
+              }
+            }
+          },
+          required: ["clientId", "id", "workflow"]
         }
       }
     ]
@@ -203,6 +247,75 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
           content: [{
             type: "text",
             text: JSON.stringify(formattedWorkflows, null, 2),
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: error instanceof Error ? error.message : "Unknown error occurred",
+          }],
+          isError: true
+        };
+      }
+    }
+
+    case "get-workflow": {
+      const { clientId, id } = args as { clientId: string; id: string };
+      const client = clients.get(clientId);
+      if (!client) {
+        return {
+          content: [{
+            type: "text",
+            text: "Client not initialized. Please run init-n8n first.",
+          }],
+          isError: true
+        };
+      }
+
+      try {
+        const workflow = await client.getWorkflow(id);
+        return {
+          content: [{
+            type: "text",
+            text: JSON.stringify(workflow, null, 2),
+          }]
+        };
+      } catch (error) {
+        return {
+          content: [{
+            type: "text",
+            text: error instanceof Error ? error.message : "Unknown error occurred",
+          }],
+          isError: true
+        };
+      }
+    }
+
+    case "update-workflow": {
+      const { clientId, id, workflow } = args as {
+        clientId: string;
+        id: string;
+        workflow: Partial<N8nWorkflow>;
+      };
+
+      const client = clients.get(clientId);
+      if (!client) {
+        return {
+          content: [{
+            type: "text",
+            text: "Client not initialized. Please run init-n8n first.",
+          }],
+          isError: true
+        };
+      }
+
+      try {
+        const updatedWorkflow = await client.updateWorkflow(id, workflow);
+        return {
+          content: [{
+            type: "text",
+            text: `Successfully updated workflow:\n${JSON.stringify(updatedWorkflow, null, 2)}`,
           }]
         };
       } catch (error) {

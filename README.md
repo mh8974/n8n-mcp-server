@@ -102,6 +102,8 @@ cline config set-env n8n N8N_API_KEY your-api-key-here
 - View detailed workflow information
 - Check workflow status
 - Manage workflow execution
+- Retrieve a workflow by ID
+- Update an existing workflow
 
 ## What Not To Do
 
@@ -111,6 +113,9 @@ When developing MCP servers, avoid these common mistakes:
    - Keep the codebase simple - just expand src/index.ts as needed
    - Avoid creating complex directory structures
    - Focus on implementing core functionality first
+   - Don't import fetch - it's already built into Node.js
+   - Before adding any new imports, check if the functionality already exists
+   - Always check N8N_API.yml for correct API endpoints and methods
 
 2. **Don't Create Planning Documents for Unimplemented Features**
    - Only document features that are actually implemented and working
@@ -132,8 +137,6 @@ When developing MCP servers, avoid these common mistakes:
 The following features are planned for future releases:
 
 ### Workflow Management
-- Retrieve a workflow by its ID
-- Update an existing workflow
 - Delete a workflow by its ID
 - Activate a workflow by its ID
 - Deactivate a workflow by its ID
